@@ -1,0 +1,59 @@
+name: Build Windows desktop release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version
+        required: true
+        default: 1.1.0
+  push:
+    tags:
+      - desktop-v*
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: npm ci
+      - run: npm test
+      - run: choco install innosetup --no-progress -y
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            "value=${{ inputs.version }}" >> $env:GITHUB_OUTPUT
+          } else {
+            "value=$('${{ github.ref_name }}'.Replace('desktop-v',''))" >> $env:GITHUB_OUTPUT
+          }
+      - name: Build installers
+        shell: pwsh
+        env:
+          UHM_ENTRA_CLIENT_ID: ${{ secrets.UHM_ENTRA_CLIENT_ID }}
+        run: |
+          .\desktop\build-desktop.ps1 `
+            -Version "${{ steps.version.outputs.value }}" `
+            -InnoCompiler "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers-${{ steps.version.outputs.value }}
+          path: artifacts/installers/*.exe
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Ultra Headcount Manager ${{ steps.version.outputs.value }}
+          generate_release_notes: true
+          files: artifacts/installers/*.exe

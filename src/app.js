@@ -150,14 +150,16 @@
     const host = $('#statusbar'); if (!host) return;
     const st = STORE.getStatus();
     host.innerHTML = '';
-    const dot = st.mode === 'file' && !st.dirty ? el('span', { class: 'ok' }, '● Saved to file')
+    const dot = st.mode === 'desktop' && !st.dirty ? el('span', { class: 'ok' }, '● Saved on this PC')
+      : st.mode === 'desktop' ? el('span', { class: 'warn' }, '● Saving…')
+      : st.mode === 'file' && !st.dirty ? el('span', { class: 'ok' }, '● Saved to file')
       : st.mode === 'file' ? el('span', { class: 'warn' }, '● Saving…')
         : st.mode === 'needs-permission' ? el('span', { class: 'warn' }, '● Permission needed')
           : el('span', { class: 'ok' }, '● Saved locally');
 
     host.appendChild(el('div', { class: 'row', style: { width: '100%' } },
       dot,
-      el('span', { class: 'muted' }, st.file ? st.file : 'IndexedDB on this device'),
+      el('span', { class: 'muted' }, st.mode === 'desktop' ? 'Protected app data with rolling backups' : (st.file ? st.file : 'IndexedDB on this device')),
       st.lastSaved ? el('span', { class: 'muted' }, `Last saved ${new Date(st.lastSaved).toLocaleTimeString('en-GB')}`) : null,
       st.mode === 'needs-permission' ? el('button', {
         class: 'btn sm', onclick: async () => {
@@ -187,10 +189,10 @@
   function openPalette() {
     if (paletteOpen) return;
     paletteOpen = true;
-    const input = el('input', { type: 'text', placeholder: 'Jump to a view, find a person, or type "Jan Cordtz leaves 31 Dec"…' });
+    const input = el('input', { type: 'text', placeholder: 'Jump to a view, find a person, or type "Alex Morgan leaves 31 Dec"…' });
     const list = el('div', { class: 'cmdk-list' });
     const box = el('div', { class: 'cmdk-box' }, input, list,
-      el('div', { class: 'cmdk-hint' }, 'Try: "October" · "Jan Cordtz leaves 31 Dec" · "Mette on leave from 1 Nov to 1 Mar" · "hire Security start 1 Feb" · "board pack"'));
+      el('div', { class: 'cmdk-hint' }, 'Try: "October" · "Alex Morgan leaves 31 Dec" · "Taylor Lee on leave from 1 Nov to 1 Mar" · "hire Security start 1 Feb" · "board pack"'));
     const scrim = el('div', { class: 'cmdk', onclick: e => { if (e.target === scrim) close(); } }, box);
     document.body.appendChild(scrim);
     let items = [], sel = 0;
@@ -531,6 +533,9 @@
         APP.ready = true;
         APP.view = APP.state.settings.lastView || 'dashboard';
         APP.render();
+        if (cached.recovered) {
+          toast('The latest save was damaged, so the app safely restored the previous copy.', 'warn');
+        }
         toast('Loaded your locally saved plan', 'ok');
       } catch (err) { console.error(err); welcome(); }
     } else {
@@ -580,7 +585,7 @@
 
   /* exposed for the console and for tests */
   window.CUHM = {
-    APP, ENGINE: E, STORE, UI, IMPORTS, DIRECTORY_SYNC, PWA, VIEWS, parseDateish, parseNatural, openPalette,
+    APP, ENGINE: E, STORE, UI, IMPORTS, DIRECTORY_SYNC, PWA, DESKTOP, VIEWS, parseDateish, parseNatural, openPalette,
     views: {
       dashboard: VIEW_DASHBOARD, ribbon: VIEW_RIBBON, risk: VIEW_RISK,
       timeline: VIEW_TIMELINE, org: VIEW_ORG, people: VIEW_PEOPLE,

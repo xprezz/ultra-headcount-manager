@@ -2,6 +2,11 @@ node_modules/
 test/shots/
 .local-validation/
 dist/
+artifacts/
+desktop/bin/
+desktop/obj/
+desktop/WebApp/
+desktop/Dependencies/
 index.html
 .DS_Store
 *.log

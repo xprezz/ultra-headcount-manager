@@ -19,6 +19,7 @@ const PWA = (() => {
   }
 
   function installButton() {
+    if (typeof DESKTOP !== 'undefined' && DESKTOP.available) return null;
     if (isStandalone() || !promptEvent) return null;
     return UI.el('button', {
       class: 'btn',
@@ -31,6 +32,7 @@ const PWA = (() => {
   }
 
   async function init() {
+    if (typeof DESKTOP !== 'undefined' && DESKTOP.available) return;
     if (initialized) return;
     initialized = true;
     window.addEventListener('beforeinstallprompt', event => {

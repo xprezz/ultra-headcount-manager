@@ -1,11 +1,13 @@
 {
   "name": "ultra-headcount-manager",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Installable, local-first organization capacity and headcount planner.",
   "scripts": {
     "build": "node build.js",
     "build:dist": "node build.js dist/index.html",
+    "build:desktop:web": "node build.js desktop/WebApp/index.html",
+    "build:desktop": "powershell -ExecutionPolicy Bypass -File desktop/build-desktop.ps1",
     "test:engine": "node test/engine-generic.js",
     "test:pwa": "node test/pwa.js",
     "test": "node test/engine-generic.js && node test/pwa.js"

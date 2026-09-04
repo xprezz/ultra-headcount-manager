@@ -8,6 +8,7 @@ const SRC = path.join(__dirname, 'src');
 /* Dependency order matters — these are plain globals, not modules. */
 const ORDER = [
   'engine.js',
+  'desktop-bridge.js',
   'store.js',
   'ui-core.js',
   'imports.js',

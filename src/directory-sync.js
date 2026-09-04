@@ -1,12 +1,12 @@
 /* ============================================================================
    Ultra Headcount Manager — Microsoft Graph organization bootstrap.
-   Uses delegated User.Read.All; tokens remain in MSAL's session cache.
+   Uses delegated User.Read.All. Desktop authentication is owned by the trusted
+   Windows host; the web fallback uses the publisher-managed MSAL configuration.
    ========================================================================== */
 const DIRECTORY_SYNC = (() => {
   'use strict';
   const { el, modal, toast, confirmDialog, APP } = UI;
   const E = ENGINE;
-  const CONFIG_KEY = 'uhm:graph-config';
   const SCOPES = ['User.Read.All'];
   const SELECT = 'id,displayName,mail,userPrincipalName,jobTitle,department,officeLocation,employeeType,accountEnabled';
   let client = null;
@@ -14,19 +14,10 @@ const DIRECTORY_SYNC = (() => {
 
   function readConfig() {
     const deployment = window.UHM_DIRECTORY_CONFIG || {};
-    try {
-      const local = JSON.parse(localStorage.getItem(CONFIG_KEY) || '{}');
-      return Object.assign(
-        { clientId: '', tenantId: 'organizations' },
-        deployment,
-        local.clientId ? local : {}
-      );
-    } catch { return Object.assign({ clientId: '', tenantId: 'organizations' }, deployment); }
+    return Object.assign({ clientId: '', tenantId: 'organizations' }, deployment);
   }
 
-  function saveConfig(config) {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-  }
+  function saveConfig() {}
 
   function redirectUri() {
     const url = new URL('./', location.href);
@@ -164,7 +155,21 @@ const DIRECTORY_SYNC = (() => {
   }
 
   async function fetchTree(config, leaderValue, options, progress) {
-    if (!config.clientId) throw new Error('Enter the Application (client) ID from the Entra app registration.');
+    if (typeof DESKTOP !== 'undefined' && DESKTOP.available) {
+      const off = DESKTOP.on('directory.progress', progress);
+      try {
+        const result = await DESKTOP.invoke('directory.sync', {
+          leader: leaderValue,
+          maxDepth: options.maxDepth,
+          includeInactive: options.includeInactive
+        });
+        result.people = (result.people || []).map(E.normalisePerson);
+        return result;
+      } finally {
+        off();
+      }
+    }
+    if (!config.clientId) throw new Error('Microsoft 365 import is not enabled in this release. Ask the app publisher to configure organizational sign-in.');
     return fetchTreeWithToken(await token(config), leaderValue, options, progress);
   }
 
@@ -219,8 +224,6 @@ const DIRECTORY_SYNC = (() => {
 
   function open() {
     const saved = readConfig();
-    const clientId = el('input', { type: 'text', value: saved.clientId, placeholder: 'Application (client) ID' });
-    const tenantId = el('input', { type: 'text', value: saved.tenantId, placeholder: 'Tenant ID or organizations' });
     const leader = el('input', { type: 'text', value: 'Me', placeholder: 'Me, UPN or email' });
     const depth = el('input', { type: 'number', min: '1', max: '99', value: '99' });
     const inactive = el('input', { type: 'checkbox' });
@@ -228,12 +231,10 @@ const DIRECTORY_SYNC = (() => {
       'Nothing is read until you sign in.');
     const run = el('button', {
       class: 'btn primary', onclick: async () => {
-        const config = { clientId: clientId.value.trim(), tenantId: tenantId.value.trim() || 'organizations' };
-        saveConfig(config);
         run.disabled = true;
-        progress.textContent = 'Signing in…';
+        progress.textContent = 'Opening your Microsoft work account…';
         try {
-          const result = await fetchTree(config, leader.value, {
+          const result = await fetchTree(saved, leader.value, {
             maxDepth: Math.min(99, Math.max(1, parseInt(depth.value, 10) || 99)),
             includeInactive: inactive.checked
           }, status => {
@@ -244,7 +245,9 @@ const DIRECTORY_SYNC = (() => {
         } catch (error) {
           console.error(error);
           const admin = error.status === 403 || /consent|privilege|permission/i.test(error.message);
-          progress.textContent = admin
+          progress.textContent = error.code === 'directory_not_configured'
+            ? 'Microsoft 365 import has not been enabled by the publisher yet. CSV, Excel and manual setup remain available.'
+            : admin
             ? `Access was denied. An Entra administrator must grant delegated User.Read.All to this app. ${error.message}`
             : error.message;
           run.disabled = false;
@@ -253,23 +256,16 @@ const DIRECTORY_SYNC = (() => {
     }, 'Sign in and preview');
 
     modal('Populate from Microsoft 365', el('div', {},
-      el('p', { class: 'sub' }, 'Read a leader and every reporting level beneath them. The app asks only for delegated User.Read.All; it never asks for Directory.Read.All and never stores your access token itself.'),
+      el('p', { class: 'sub' }, 'Choose your Microsoft work account, then preview a leader and every reporting level beneath them before anything is imported.'),
       el('div', { class: 'grid g2' },
-        el('label', { class: 'field' }, 'Application (client) ID', clientId,
-          el('span', { class: 'tiny muted' }, 'Public identifier from your Entra SPA registration.')),
-        el('label', { class: 'field' }, 'Tenant ID', tenantId,
-          el('span', { class: 'tiny muted' }, 'Use your tenant GUID for a single-tenant app.')),
         el('label', { class: 'field' }, 'Start from leader', leader,
           el('span', { class: 'tiny muted' }, 'Me, object ID, UPN, or mail address.')),
         el('label', { class: 'field' }, 'Reporting levels', depth,
           el('span', { class: 'tiny muted' }, '99 means every level, with a 5,000-person safety limit.'))),
       el('label', { class: 'checkline' }, inactive, ' Include disabled directory accounts'),
-      el('details', { style: { marginTop: '12px' } },
-        el('summary', {}, 'Entra administrator setup'),
-        el('div', { class: 'small setup-steps' },
-          el('p', {}, 'Register a Single-page application and add this exact redirect URI:'),
-          el('code', {}, redirectUri()),
-          el('p', {}, 'Add Microsoft Graph delegated permission User.Read.All and grant admin consent. Do not create or paste a client secret.'))),
+      el('div', { class: 'callout', style: { marginTop: '12px' } },
+        el('b', {}, 'Private by design'),
+        el('div', { class: 'small' }, 'The app requests read-only profile access for this import. Tokens stay with the Microsoft sign-in component and organization data is saved only on this PC.')),
       progress,
       el('div', { class: 'row', style: { marginTop: '14px' } },
         run,

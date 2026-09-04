@@ -14,8 +14,9 @@ const STORE = (() => {
   const LS_META = 'uhm:meta';
   const MAX_BACKUPS = 20;
   const SAVE_DEBOUNCE = 800;
+  const desktop = typeof DESKTOP !== 'undefined' && DESKTOP.available;
 
-  const supported = typeof window !== 'undefined' && 'showSaveFilePicker' in window;
+  const supported = !desktop && typeof window !== 'undefined' && 'showSaveFilePicker' in window;
 
   /* ---------- IndexedDB (handle cache only) ------------------------------- */
   function idb() {
@@ -82,7 +83,13 @@ const STORE = (() => {
   let dirHandle = null;
   let saveTimer = null;
   let listeners = [];
-  let status = { mode: 'browser', file: '', lastSaved: null, dirty: false, error: '' };
+  let status = {
+    mode: desktop ? 'desktop' : 'browser',
+    file: desktop ? 'Headcount plan' : '',
+    lastSaved: null,
+    dirty: false,
+    error: ''
+  };
 
   const on = fn => { listeners.push(fn); return () => { listeners = listeners.filter(l => l !== fn); }; };
   const emit = () => listeners.forEach(fn => { try { fn(Object.assign({}, status)); } catch (e) { console.error(e); } });
@@ -102,6 +109,7 @@ const STORE = (() => {
 
   /* ---------- localStorage mirror ----------------------------------------- */
   function mirror(state) {
+    if (desktop) return;
     try {
       localStorage.setItem(LS_KEY, JSON.stringify(state));
       localStorage.setItem(LS_META, JSON.stringify({ at: new Date().toISOString(), file: status.file }));
@@ -149,6 +157,10 @@ const STORE = (() => {
 
   /** Silently reconnect to the previously used file. */
   async function reconnect() {
+    if (desktop) {
+      setStatus({ mode: 'desktop', file: 'Headcount plan', error: '' });
+      return null;
+    }
     const h = await idbGet('file');
     if (!h) return null;
     fileHandle = h;
@@ -168,6 +180,22 @@ const STORE = (() => {
   }
 
   async function load() {
+    if (desktop) {
+      const result = await DESKTOP.invoke('state.load');
+      if (!result || !result.json) return { data: null, source: 'desktop-empty' };
+      setStatus({
+        mode: 'desktop',
+        file: result.displayName || 'Headcount plan',
+        lastSaved: result.lastSaved || null,
+        dirty: false,
+        error: ''
+      });
+      return {
+        data: JSON.parse(result.json),
+        source: result.recovered ? 'desktop-recovery' : 'desktop',
+        recovered: Boolean(result.recovered)
+      };
+    }
     if (fileHandle && status.mode === 'file') {
       try {
         const data = await readHandle(fileHandle);
@@ -220,6 +248,26 @@ const STORE = (() => {
   /* ---------- saving ------------------------------------------------------ */
   async function saveNow(state, opts = {}) {
     state.savedAt = new Date().toISOString();
+    if (desktop) {
+      try {
+        setStatus({ mode: 'desktop', dirty: true, error: '' });
+        const result = await DESKTOP.invoke('state.save', {
+          json: JSON.stringify(state),
+          backup: Boolean(opts.backup)
+        });
+        setStatus({
+          mode: 'desktop',
+          file: result.displayName || 'Headcount plan',
+          dirty: false,
+          lastSaved: result.lastSaved || new Date().toISOString(),
+          error: ''
+        });
+        return { ok: true, source: 'desktop' };
+      } catch (error) {
+        setStatus({ mode: 'desktop', dirty: true, error: error.message });
+        return { ok: false, reason: error.message };
+      }
+    }
     mirror(state);
     if (!fileHandle || status.mode !== 'file') {
       setStatus({ mode: 'browser', dirty: false, lastSaved: new Date().toISOString(), error: '' });
@@ -244,7 +292,7 @@ const STORE = (() => {
   function save(state, opts) {
     setStatus({ dirty: true });
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => saveNow(state, opts), SAVE_DEBOUNCE);
+    saveTimer = setTimeout(() => saveNow(state, opts), desktop ? 250 : SAVE_DEBOUNCE);
   }
 
   function flush(state) { clearTimeout(saveTimer); return saveNow(state); }
@@ -282,7 +330,7 @@ const STORE = (() => {
   }
 
   return {
-    supported, on, getStatus, setStatus,
+    supported, desktop, on, getStatus, setStatus,
     chooseFile, reconnect, grant, load, save, saveNow, flush, disconnect,
     chooseBackupFolder, writeBackup, download, uploadJson, readMirror, mirrorMeta,
     idbStateGet, idbStateSet

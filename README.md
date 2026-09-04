@@ -1,6 +1,6 @@
-# Ultra Headcount Manager
+# Ultra Headcount Manager for Windows
 
-An installable, local-first organization capacity planner. Model blueprint seats,
+A real, local-first Windows organization capacity planner. Model blueprint seats,
 leave, garden leave, departures, hiring, ramp-up, spans of control, workload and
 month-by-month capacity without sending planning data to an application backend.
 
@@ -14,33 +14,40 @@ month-by-month capacity without sending planning data to an application backend.
 - Build an initial seat blueprint from imported employees. Student workers,
   interns, contractors, vendors, apprentices and loaned-in workers provide
   supplementary capacity but do not consume seats.
-- Install the app from Edge or Chrome and keep using it offline.
+- Install from a normal Windows setup executable with Start-menu integration and
+  a clean uninstaller.
 - Export JSON backups, CSV reports and a standalone board pack.
 
 ## Data and privacy
 
-The app has no application server and no telemetry.
+The Windows app has no application server and no telemetry.
 
-- **Primary persistence:** IndexedDB in the installed browser profile.
-- **Optional persistence:** a user-selected JSON file, with optional rolling
-  backups to a chosen folder.
-- **Directory sync:** delegated Microsoft Graph calls made directly from the
-  browser. MSAL manages session tokens; the app does not copy tokens into its
-  headcount data or send them elsewhere.
-- **Spreadsheet import:** parsed locally in the browser.
+- **Primary persistence:** atomic JSON storage in
+  `%LOCALAPPDATA%\Ultra Headcount Manager`, with a recovery copy and up to 20
+  rolling backups.
+- **Directory sync:** delegated Microsoft Graph calls made by the trusted Windows
+  host. MSAL.NET uses the Windows account broker; access tokens never enter the
+  application UI or headcount data.
+- **Spreadsheet import:** parsed locally in the application.
 
-Clearing site data removes the IndexedDB copy. Use **Data & reports → Export JSON
-backup** or connect a JSON data file for an additional copy.
+The previous browser/PWA build remains available as a fallback, but it is no longer
+the primary distribution.
 
 ## Install
 
-Open the published HTTPS site in Edge or Chrome and select **Install app** when it
-appears in the header. The browser may also expose installation in its address bar
-or application menu.
+Download the setup executable matching the PC from
+[GitHub Releases](https://github.com/xprezz/ultra-headcount-manager/releases):
 
-The manifest, service worker and 192/512-pixel icons are included. The complete
-runtime (including the Excel reader and MSAL) is bundled into `index.html`; after
-the first load, the service worker keeps the shell available offline.
+- `win-x64` for standard Intel/AMD Windows PCs.
+- `win-arm64` for Windows on ARM.
+
+The installer is self-contained: users do not need .NET, Node.js, a browser
+extension, or administrator rights. Microsoft Edge WebView2 is part of supported
+Windows 10/11 installations.
+
+Unsigned community builds can trigger a Windows SmartScreen warning. Production
+internal distribution should sign the setup files and preferably publish them
+through Intune Company Portal.
 
 ## Populate from CSV or Excel
 
@@ -65,26 +72,30 @@ When Role is absent, Job title becomes the initial generic role. Choose **Merge*
 to preserve existing planning events for matched people, or **Replace** to start a
 new roster. Matching uses directory ID, then email, then name.
 
-## Microsoft 365 directory setup
+## Microsoft 365 directory setup for the publisher
 
-Directory sync needs a one-time Microsoft Entra application registration:
+End users never enter a client ID or tenant ID. Directory sync needs one centrally
+managed Microsoft Entra application registration:
 
-1. Register a **Single-page application**, single tenant.
-2. Add the exact redirect URI:
-   `https://xprezz.github.io/ultra-headcount-manager/`
+1. Register a **Mobile and desktop application**, single tenant.
+2. Enable public-client flows and add the broker redirect URI
+   `ms-appx-web://Microsoft.AAD.BrokerPlugin/<CLIENT_ID>`.
 3. Add Microsoft Graph **delegated** permission `User.Read.All`.
 4. Grant administrator consent.
-5. Do **not** create a client secret. Browser SPAs use authorization code + PKCE.
-6. Put the public Application (client) ID in `config.js`.
+5. Do **not** create a client secret.
+6. Store the public client ID as the `UHM_ENTRA_CLIENT_ID` repository secret. The
+   release workflow embeds it into `desktopsettings.json`.
 
 `User.Read.All` is the least-privileged practical delegated permission for the
 fields used here (`department`, `jobTitle`, `officeLocation`, `employeeType`,
 `accountEnabled`) across other users. The app does not request
 `Directory.Read.All`.
 
-Microsoft's tenant may require a Service/Asset Management reference when creating
-the registration. Use the approved internal registration flow and its real
-service metadata; do not invent a reference.
+Microsoft's tenant requires a real Service/Asset Management reference when
+creating the registration. Use the approved internal registration flow and its
+real service metadata; do not invent a reference. Until the publisher supplies
+that approved client ID, CSV, Excel, JSON and manual setup remain fully available
+and the app gives a friendly unavailable message for Microsoft 365 import.
 
 ### How sync works
 
@@ -100,17 +111,18 @@ ignored.
 
 ## Development
 
-Requirements: Node.js 22+ and Microsoft Edge for browser tests.
+Requirements: Node.js 22+, .NET 8 SDK, Inno Setup 6 and Microsoft Edge WebView2.
 
 ```powershell
 npm ci
 npm run build
 npm test
+npm run build:desktop
 ```
 
-`npm run build` writes `index.html`. It inlines all runtime JavaScript and CSS but
-keeps deployment configuration, manifest, service worker and icons as normal PWA
-assets.
+`npm run build` writes the fallback web app. `npm run build:desktop` builds
+self-contained x64 and ARM64 executables and packages normal Windows setup files
+under `artifacts/installers`.
 
 The public synthetic suite covers the calculation engine, PWA manifest/service
 worker, dark theme, real XLSX parsing, generic CSV mapping, paged recursive Graph
@@ -121,21 +133,23 @@ from source control; real employee data must never be published with the app.
 
 ## Deployment
 
-Push `main` to GitHub. `.github/workflows/pages.yml` runs `npm ci`, builds `dist/`,
-uploads only the deployable PWA assets and publishes them with GitHub Pages.
+Tag a release as `desktop-v1.1.0` (or dispatch the desktop workflow manually).
+`.github/workflows/desktop-release.yml` tests the app, builds x64 and ARM64
+installers, and attaches tagged builds to a GitHub Release. The optional
+`UHM_ENTRA_CLIENT_ID` secret enables one-click Microsoft 365 import.
 
-For a fork, update:
-
-1. The redirect URI in the Entra app registration.
-2. `clientId` and `tenantId` in `config.js`.
-3. The redirect URI shown in this README.
+`.github/workflows/pages.yml` continues to publish the fallback browser build.
 
 ## Architecture
 
-The application remains framework-free at runtime. `build.js` concatenates plain
-global modules in dependency order:
+The planning UI remains framework-free. `build.js` concatenates plain global
+modules in dependency order:
 
-`engine → store → ui → imports → directory sync → PWA → views → app`
+`engine → desktop bridge → store → ui → imports → directory sync → PWA → views → app`
+
+The Windows host is WPF/.NET 8 with WebView2. A narrow JSON bridge exposes only
+state storage, application metadata, and Microsoft 365 import. The renderer has
+no direct filesystem or token access.
 
 Dates are `YYYY-MM-DD` strings compared lexicographically. An exit date is the
 last working day; a leave end date is the return date. All edits flow through
