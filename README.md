@@ -71,7 +71,7 @@ Directory sync needs a one-time Microsoft Entra application registration:
 
 1. Register a **Single-page application**, single tenant.
 2. Add the exact redirect URI:
-   `https://chmors.github.io/ultra-headcount-manager/`
+   `https://xprezz.github.io/ultra-headcount-manager/`
 3. Add Microsoft Graph **delegated** permission `User.Read.All`.
 4. Grant administrator consent.
 5. Do **not** create a client secret. Browser SPAs use authorization code + PKCE.
