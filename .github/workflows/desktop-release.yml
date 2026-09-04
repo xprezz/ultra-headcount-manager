@@ -27,6 +27,7 @@ jobs:
         with:
           dotnet-version: 8.0.x
       - run: npm ci
+      - run: npm run build
       - run: npm test
       - run: choco install innosetup --no-progress -y
       - name: Resolve version
