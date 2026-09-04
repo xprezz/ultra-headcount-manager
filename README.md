@@ -93,9 +93,20 @@ fields used here (`department`, `jobTitle`, `officeLocation`, `employeeType`,
 
 Microsoft's tenant requires a real Service/Asset Management reference when
 creating the registration. Use the approved internal registration flow and its
-real service metadata; do not invent a reference. Until the publisher supplies
-that approved client ID, CSV, Excel, JSON and manual setup remain fully available
-and the app gives a friendly unavailable message for Microsoft 365 import.
+real service metadata; do not invent a reference. The tenant error links to the
+internal resolution guide at
+[`https://aka.ms/service-management-reference-error`](https://aka.ms/service-management-reference-error).
+After approval, add the Application (client) ID to the repository:
+
+```powershell
+gh secret set UHM_ENTRA_CLIENT_ID --repo xprezz/ultra-headcount-manager
+```
+
+Then publish a new `desktop-v*` tag. The release workflow embeds the ID into both
+Windows installers; users only see the normal Microsoft account picker. Until the
+publisher supplies that approved client ID, CSV, Excel, JSON and manual setup
+remain fully available and the app gives a friendly unavailable message for
+Microsoft 365 import.
 
 ### How sync works
 
