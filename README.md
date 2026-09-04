@@ -108,6 +108,19 @@ publisher supplies that approved client ID, CSV, Excel, JSON and manual setup
 remain fully available and the app gives a friendly unavailable message for
 Microsoft 365 import.
 
+### Internal pilot shortcut
+
+The `1.1.1` internal pilot temporarily follows Frontier Solution Engineer's
+current approach and uses Microsoft's Azure CLI public-client identity
+(`04b07795-8ddb-461a-bbee-02f9e1bf7b46`). This avoids creating an Ultra-specific
+registration and works with delegated Microsoft employee access already granted
+to that client.
+
+This is deliberately a prerelease trade-off, not the production identity model:
+sign-in and audit logs identify the client as Microsoft Azure CLI, Ultra does not
+control its permissions or lifecycle, and Microsoft can restrict this usage. A
+Service Tree-backed Ultra registration remains the supported long-term target.
+
 ### How sync works
 
 The app resolves `/me`, an object ID, or a UPN. If an email is not a UPN it falls

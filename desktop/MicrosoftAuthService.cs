@@ -32,17 +32,14 @@ public sealed class MicrosoftAuthService
     public async Task<string> GetGraphTokenAsync()
     {
         var accounts = await _client.GetAccountsAsync();
-        var account = accounts.FirstOrDefault();
-        if (account is not null)
+        var account = accounts.FirstOrDefault() ?? PublicClientApplication.OperatingSystemAccount;
+        try
         {
-            try
-            {
-                var silent = await _client.AcquireTokenSilent(Scopes, account).ExecuteAsync();
-                return silent.AccessToken;
-            }
-            catch (MsalUiRequiredException)
-            {
-            }
+            var silent = await _client.AcquireTokenSilent(Scopes, account).ExecuteAsync();
+            return silent.AccessToken;
+        }
+        catch (MsalUiRequiredException)
+        {
         }
 
         var handle = new WindowInteropHelper(_window).Handle;
