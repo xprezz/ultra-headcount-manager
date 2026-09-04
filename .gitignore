@@ -1,0 +1,7 @@
+node_modules/
+test/shots/
+.local-validation/
+dist/
+index.html
+.DS_Store
+*.log

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  (() => {
+    const param = new URLSearchParams(window.location.search).get("scoutTheme");
+    const theme =
+      param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", theme);
+  })();
+</script>
+<script src="./config.js"></script>
+<title>Ultra Headcount Manager</title>
+<meta name="description" content="Local-first organization capacity and headcount planning.">
+<meta name="theme-color" content="#b11f4b">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<style>/*__CSS__*/</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero" id="hero"></header>
+  <nav class="nav" id="nav"></nav>
+  <main id="body"></main>
+  <footer class="appfoot">
+    Ultra Headcount Manager · all figures computed live from your model
+  </footer>
+</div>
+<div class="toasts" id="toasts"></div>
+<div class="statusbar" id="statusbar"></div>
+<noscript><p class="noscript">This application needs JavaScript.</p></noscript>
+<script>/*__JS__*/</script>
+</body>
+</html>

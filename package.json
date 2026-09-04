@@ -1,0 +1,20 @@
+{
+  "name": "ultra-headcount-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Installable, local-first organization capacity and headcount planner.",
+  "scripts": {
+    "build": "node build.js",
+    "build:dist": "node build.js dist/index.html",
+    "test:engine": "node test/engine-generic.js",
+    "test:pwa": "node test/pwa.js",
+    "test": "node test/engine-generic.js && node test/pwa.js"
+  },
+  "dependencies": {
+    "@azure/msal-browser": "^4.25.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.55.0"
+  }
+}
